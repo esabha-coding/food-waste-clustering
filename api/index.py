@@ -3,10 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware  # <-- ADD THIS IMPORT
 
 app = FastAPI()
 
-# <-- ADD THIS CORS CONFIGURATION BLOCK -->
+# <-- ADD THIS CORS MIDDLEWARE BLOCK -->
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all websites to query your API (perfect for projects)
+    allow_origins=["*"],  # Allows all domains (including your Vercel frontend) to access the API
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -54,7 +54,7 @@ This project analyzes global food-wastage data, applies preprocessing and unsupe
 
 The repository follows a simple, single-repo layout where the backend and frontend are colocated. Data processing scripts produce CSV artifacts consumed by the backend which exposes HTTP endpoints. The frontend calls these endpoints to render summaries and charts.
 
-Flow:
+# Flow:
 
 1. `food_waste_analysis.py` ingests and preprocesses `WorldWide_foodwastage_dataset.csv`, runs K-Means and writes `food_waste_clustered.csv`.
 2. `cluster_analysis.py` computes descriptive statistics and writes visualization PNGs.
@@ -90,20 +90,20 @@ Prerequisites:
 
 Steps (local dev):
 
-1. Create and activate a Python virtual environment (recommended):
+# 1. Create and activate a Python virtual environment (recommended):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-2. Install backend requirements:
+# 2. Install backend requirements:
 
 ```powershell
 python -m pip install -r backend/requirements.txt
 ```
 
-3. Install frontend dependencies (from `frontend/`):
+# 3. Install frontend dependencies (from `frontend/`):
 
 ```bash
 cd frontend
@@ -112,13 +112,13 @@ npm install
 
 ## Running the Project
 
-1. Start the backend (from repo root):
+# 1. Start the backend (from repo root):
 
 ```bash
 python -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-2. Start the frontend (in a separate terminal, from `frontend/`):
+# 2. Start the frontend (in a separate terminal, from `frontend/`):
 
 ```bash
 npm run dev

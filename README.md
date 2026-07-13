@@ -90,20 +90,20 @@ Prerequisites:
 
 Steps (local dev):
 
-# 1. Create and activate a Python virtual environment (recommended):
+ 1. Create and activate a Python virtual environment (recommended):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-# 2. Install backend requirements:
+ 2. Install backend requirements:
 
 ```powershell
 python -m pip install -r backend/requirements.txt
 ```
 
-# 3. Install frontend dependencies (from `frontend/`):
+ 3. Install frontend dependencies (from `frontend/`):
 
 ```bash
 cd frontend
@@ -112,13 +112,13 @@ npm install
 
 ## Running the Project
 
-# 1. Start the backend (from repo root):
+ 1. Start the backend (from repo root):
 
 ```bash
 python -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-# 2. Start the frontend (in a separate terminal, from `frontend/`):
+ 2. Start the frontend (in a separate terminal, from `frontend/`):
 
 ```bash
 npm run dev
@@ -176,6 +176,4 @@ Contributions welcome. Suggested process:
 - Dataset source (place the original data source citation here)
 - Libraries and tools used: pandas, scikit-learn, FastAPI, Next.js
 
----
 
-If you want, I can add badges, a license file, or a short example notebook demonstrating the preprocessing pipeline; tell me which you prefer.

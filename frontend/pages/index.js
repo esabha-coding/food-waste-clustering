@@ -9,7 +9,12 @@ export default function Home() {
   useEffect(() => {
     async function loadSummary() {
       try {
-        const response = await fetch('/api/summary');
+        // Resolve the backend base URL dynamically
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        
+        // Fetch from your live FastAPI backend domain
+        const response = await fetch(`${apiBase}/api/summary`);
+        
         if (!response.ok) throw new Error('Failed to load summary');
         const data = await response.json();
         setSummary(data);
@@ -43,7 +48,7 @@ export default function Home() {
                 <p><strong>Rows:</strong> {summary.rows}</p>
                 <p><strong>Cluster counts:</strong> {JSON.stringify(summary.clusters)}</p>
                 <p><strong>Average total waste:</strong> {summary.avg_total_waste_tons} tons</p>
-                <p><strong>Average economic loss:</strong> {summary.avg_economic_loss_million} million</p>
+                <p><strong>Average economic loss:</strong> ${summary.avg_economic_loss_million} million</p>
               </>
             )}
           </div>
@@ -51,7 +56,7 @@ export default function Home() {
           <div className="info-block">
             <h2>How to run locally</h2>
             <ol>
-              <li>Start the backend: <code>uvicorn backend.app:app --reload</code></li>
+              <li>Start the backend: <code>uvicorn api.index:app --reload</code></li>
               <li>Start the frontend: <code>npm run dev</code></li>
               <li>Open <code>http://localhost:3000</code></li>
             </ol>

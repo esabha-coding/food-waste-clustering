@@ -1,12 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # <-- ADD THIS IMPORT
 
-# Vercel needs this instance to be named exactly 'app'
 app = FastAPI()
 
-@app.get("/api/health")
-def health():
-    return {"status": "FastAPI is connected and running on Vercel!"}
-
-@app.get("/api/predict")
-def predict():
-    return {"message": "K-Means logic placeholder"}
+# <-- ADD THIS CORS CONFIGURATION BLOCK -->
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all websites to query your API (perfect for projects)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

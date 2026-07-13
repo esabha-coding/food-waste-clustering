@@ -1,7 +1,12 @@
-import sys
-from pathlib import Path
+from fastapi import FastAPI
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+# Vercel needs this instance to be named exactly 'app'
+app = FastAPI()
 
-from backend.app import app
+@app.get("/api/health")
+def health():
+    return {"status": "FastAPI is connected and running on Vercel!"}
+
+@app.get("/api/predict")
+def predict():
+    return {"message": "K-Means logic placeholder"}

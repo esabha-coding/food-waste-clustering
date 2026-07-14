@@ -7,7 +7,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Fetches directly from your live Vercel API
-    fetch('https://food-waste-clustering.vercel.app/api/summary')
+    fetch('/api/summary')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch backend data');
         return res.json();

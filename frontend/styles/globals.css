@@ -1,65 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 html,
 body {
   padding: 0;
   margin: 0;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f0f4f8;
-  color: #111827;
 }
 
 * {
   box-sizing: border-box;
 }
 
-.page-shell {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.card {
-  width: min(900px, 100%);
-  border-radius: 24px;
-  padding: 32px;
-  background: #ffffff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
-}
-
-.card h1 {
-  margin: 0 0 16px;
-  font-size: 2.4rem;
-}
-
-.card p {
-  line-height: 1.7;
-  margin: 0 0 24px;
-}
-
-.info-block {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 18px;
-}
-
-.info-block h2 {
-  margin-top: 0;
-}
-
-.info-block code {
-  background: #e2e8f0;
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-
-ol {
-  margin: 0;
-  padding-left: 18px;
-}
-
-li {
-  margin-bottom: 10px;
-}

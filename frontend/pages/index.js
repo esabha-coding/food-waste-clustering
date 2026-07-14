@@ -1,4 +1,46 @@
 import { useEffect, useState } from 'react';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Filler,
+} from 'chart.js';
+import { Doughnut, Bar, Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Filler
+);
+
+const CLUSTER_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b'];
+const CLUSTER_BG = ['rgba(16,185,129,0.15)', 'rgba(14,165,233,0.15)', 'rgba(139,92,246,0.15)', 'rgba(244,63,94,0.15)'];
+const BAR_COLORS = [
+  'rgba(16,185,129,0.75)', 'rgba(14,165,233,0.75)', 'rgba(139,92,246,0.75)', 'rgba(244,63,94,0.75)',
+  'rgba(245,158,11,0.75)', 'rgba(251,146,60,0.75)', 'rgba(99,102,241,0.75)', 'rgba(20,184,166,0.75)',
+];
+
+const chartDefaults = {
+  plugins: { legend: { labels: { color: '#94a3b8', font: { size: 12 } } } },
+  scales: {
+    x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+    y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+  },
+};
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -11,14 +53,8 @@ export default function Dashboard() {
         if (!res.ok) throw new Error('Failed to fetch backend data');
         return res.json();
       })
-      .then((data) => {
-        setData(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((err) => { setError(err.message); setLoading(false); });
   }, []);
 
   if (loading) {
@@ -44,12 +80,95 @@ export default function Dashboard() {
     );
   }
 
-  const clusterCountsRaw = data.cluster_counts ?? data.clusters ?? {};
-  const clusterCounts = typeof clusterCountsRaw === 'string'
-    ? JSON.parse(clusterCountsRaw)
-    : clusterCountsRaw;
-  const averageTotalWaste = data.average_total_waste ?? data.avg_total_waste_tons ?? 0;
-  const averageEconomicLoss = data.average_economic_loss ?? data.avg_economic_loss_million ?? 0;
+  const clusterCounts = data.clusters ?? {};
+  const clusterAverages = data.cluster_averages ?? {};
+  const topCountries = data.top_countries ?? {};
+  const topFoodTypes = data.top_food_types ?? {};
+  const yearTrend = data.year_trend ?? {};
+  const averageTotalWaste = data.avg_total_waste_tons ?? 0;
+  const averageEconomicLoss = data.avg_economic_loss_million ?? 0;
+
+  // ── Chart datasets ──────────────────────────────────────────────
+
+  const clusterDoughnutData = {
+    labels: Object.keys(clusterCounts).map((k) => `Cluster ${k}`),
+    datasets: [{
+      data: Object.values(clusterCounts),
+      backgroundColor: CLUSTER_COLORS,
+      borderColor: CLUSTER_COLORS,
+      borderWidth: 2,
+      hoverOffset: 8,
+    }],
+  };
+
+  const countriesBarData = {
+    labels: Object.keys(topCountries),
+    datasets: [{
+      label: 'Total Waste (Tons)',
+      data: Object.values(topCountries),
+      backgroundColor: BAR_COLORS,
+      borderRadius: 6,
+      borderSkipped: false,
+    }],
+  };
+
+  const foodTypesBarData = {
+    labels: Object.keys(topFoodTypes),
+    datasets: [{
+      label: 'Records',
+      data: Object.values(topFoodTypes),
+      backgroundColor: BAR_COLORS,
+      borderRadius: 6,
+      borderSkipped: false,
+    }],
+  };
+
+  const clusterIds = Object.keys(clusterAverages).sort();
+  const clusterCompareData = {
+    labels: clusterIds.map((k) => `Cluster ${k}`),
+    datasets: [
+      {
+        label: 'Avg Total Waste (Tons)',
+        data: clusterIds.map((k) => clusterAverages[k]?.avg_total_waste_tons ?? 0),
+        backgroundColor: 'rgba(16,185,129,0.7)',
+        borderRadius: 6,
+      },
+      {
+        label: 'Avg Economic Loss ($M)',
+        data: clusterIds.map((k) => clusterAverages[k]?.avg_economic_loss_million ?? 0),
+        backgroundColor: 'rgba(14,165,233,0.7)',
+        borderRadius: 6,
+      },
+      {
+        label: 'Avg Per Capita Waste (Kg)',
+        data: clusterIds.map((k) => clusterAverages[k]?.avg_per_capita_waste_kg ?? 0),
+        backgroundColor: 'rgba(139,92,246,0.7)',
+        borderRadius: 6,
+      },
+      {
+        label: 'Avg Household Waste (%)',
+        data: clusterIds.map((k) => clusterAverages[k]?.avg_household_waste_percent ?? 0),
+        backgroundColor: 'rgba(245,158,11,0.7)',
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const yearLabels = Object.keys(yearTrend).sort();
+  const yearLineData = {
+    labels: yearLabels,
+    datasets: [{
+      label: 'Total Waste (Tons)',
+      data: yearLabels.map((y) => yearTrend[y] ?? 0),
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16,185,129,0.1)',
+      borderWidth: 2,
+      pointBackgroundColor: '#10b981',
+      pointRadius: 5,
+      tension: 0.4,
+      fill: true,
+    }],
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -71,12 +190,10 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        
-        {/* KPI Section */}
+
+        {/* KPI Cards */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* KPI 1 */}
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
             <div className="absolute top-0 right-0 h-24 w-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Total Samples Trained</p>
@@ -84,7 +201,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-500 mt-1">Dataset rows analyzed</p>
           </div>
 
-          {/* KPI 2 */}
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-sky-500/30 transition-all duration-300">
             <div className="absolute top-0 right-0 h-24 w-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Avg Total Waste</p>
@@ -94,7 +210,6 @@ export default function Dashboard() {
             <p className="text-xs text-slate-500 mt-1">Average waste per record</p>
           </div>
 
-          {/* KPI 3 */}
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-rose-500/30 transition-all duration-300">
             <div className="absolute top-0 right-0 h-24 w-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Avg Economic Loss</p>
@@ -104,26 +219,127 @@ export default function Dashboard() {
             <p className="text-xs text-slate-500 mt-1">Financial impact avg</p>
           </div>
 
-          {/* KPI 4 */}
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-violet-500/30 transition-all duration-300">
             <div className="absolute top-0 right-0 h-24 w-24 bg-violet-500/5 rounded-full blur-2xl group-hover:bg-violet-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Active Clusters</p>
-            <h3 className="text-3xl font-bold mt-2 text-white">{Object.keys(clusterCounts || {}).length} Clusters</h3>
+            <h3 className="text-3xl font-bold mt-2 text-white">{Object.keys(clusterCounts).length} Clusters</h3>
             <p className="text-xs text-slate-500 mt-1">Optimal grouping detected</p>
           </div>
         </section>
 
-        {/* Cluster Share & Models */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cluster Breakdown Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-1">
+        {/* Charts Row 1: Doughnut + Cluster Averages */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-white">Cluster Distribution</h3>
+            <p className="text-xs text-slate-400 mt-1">Share of records assigned to each cluster</p>
+            <div style={{ height: '280px' }} className="mt-6 flex items-center justify-center">
+              <Doughnut
+                data={clusterDoughnutData}
+                options={{
+                  maintainAspectRatio: false,
+                  cutout: '65%',
+                  plugins: {
+                    legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 16, font: { size: 12 } } },
+                    tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} records` } },
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Cluster Averages Comparison</h3>
+            <p className="text-xs text-slate-400 mt-1">Key metric averages per cluster</p>
+            <div style={{ height: '280px' }} className="mt-6">
+              <Bar
+                data={clusterCompareData}
+                options={{
+                  ...chartDefaults,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    ...chartDefaults.plugins,
+                    legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
+                  },
+                  scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Charts Row 2: Top Countries + Top Food Types */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Top Countries by Total Waste</h3>
+            <p className="text-xs text-slate-400 mt-1">Cumulative waste tonnage across all records</p>
+            <div style={{ height: '300px' }} className="mt-6">
+              <Bar
+                data={countriesBarData}
+                options={{
+                  maintainAspectRatio: false,
+                  indexAxis: 'y',
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#94a3b8', font: { size: 12 } }, grid: { display: false } },
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Top Food Types by Frequency</h3>
+            <p className="text-xs text-slate-400 mt-1">Most common food categories in the dataset</p>
+            <div style={{ height: '300px' }} className="mt-6">
+              <Bar
+                data={foodTypesBarData}
+                options={{
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { ticks: { color: '#64748b', maxRotation: 30, font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Charts Row 3: Year Trend (full width) */}
+        <section>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Total Waste Trend by Year</h3>
+            <p className="text-xs text-slate-400 mt-1">Aggregate waste tonnage across all countries per year</p>
+            <div style={{ height: '260px' }} className="mt-6">
+              <Line
+                data={yearLineData}
+                options={{
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Cluster Share & Model Parameters */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-1">
+            <h3 className="text-lg font-semibold text-white">Cluster Breakdown</h3>
             <p className="text-xs text-slate-400 mt-1">How samples were allocated by the model</p>
-            
             <div className="mt-6 space-y-4">
-              {clusterCounts && Object.entries(clusterCounts).map(([cluster, count]) => {
+              {Object.entries(clusterCounts).map(([cluster, count], i) => {
                 const percentage = ((count / data.rows) * 100).toFixed(1);
-                const color = cluster === '0' ? 'bg-emerald-500' : 'bg-sky-500';
+                const bar = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-rose-500'][i] ?? 'bg-slate-500';
                 return (
                   <div key={cluster} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -131,7 +347,7 @@ export default function Dashboard() {
                       <span className="text-slate-400">{count.toLocaleString()} rows ({percentage}%)</span>
                     </div>
                     <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                      <div className={`${color} h-full rounded-full`} style={{ width: `${percentage}%` }}></div>
+                      <div className={`${bar} h-full rounded-full`} style={{ width: `${percentage}%` }}></div>
                     </div>
                   </div>
                 );
@@ -139,11 +355,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Model Summary Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 lg:col-span-2">
             <h3 className="text-lg font-semibold text-white">Model Parameters</h3>
             <p className="text-xs text-slate-400 mt-1">Current state of the trained backend model</p>
-            
             <div className="mt-6 overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
@@ -168,6 +382,16 @@ export default function Dashboard() {
                     <td className="py-3.5 font-medium text-slate-300">Algorithm</td>
                     <td className="py-3.5 text-slate-400">K-Means Clustering</td>
                     <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-950 text-violet-400 border border-violet-800">Fitted</span></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3.5 font-medium text-slate-300">Per Capita Avg</td>
+                    <td className="py-3.5 text-slate-400">{data.avg_per_capita_waste_kg} Kg / person</td>
+                    <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-950 text-sky-400 border border-sky-800">Live</span></td>
+                  </tr>
+                  <tr>
+                    <td className="py-3.5 font-medium text-slate-300">Household Waste Avg</td>
+                    <td className="py-3.5 text-slate-400">{data.avg_household_waste_percent}%</td>
+                    <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-950 text-sky-400 border border-sky-800">Live</span></td>
                   </tr>
                 </tbody>
               </table>

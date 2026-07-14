@@ -6,8 +6,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetches directly from your live Vercel API
-    fetch('https://food-waste-clustering.vercel.app/api/summary')
+    fetch('/api/summary')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch backend data');
         return res.json();
@@ -45,10 +44,12 @@ export default function Dashboard() {
     );
   }
 
-  // Parse cluster counts for easy rendering
-  const clusterCounts = typeof data.cluster_counts === 'string' 
-    ? JSON.parse(data.cluster_counts) 
-    : data.cluster_counts;
+  const clusterCountsRaw = data.cluster_counts ?? data.clusters ?? {};
+  const clusterCounts = typeof clusterCountsRaw === 'string'
+    ? JSON.parse(clusterCountsRaw)
+    : clusterCountsRaw;
+  const averageTotalWaste = data.average_total_waste ?? data.avg_total_waste_tons ?? 0;
+  const averageEconomicLoss = data.average_economic_loss ?? data.avg_economic_loss_million ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -65,7 +66,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-800">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Connected to Live FastAPI Backend
+            Connected to API
           </div>
         </div>
       </header>
@@ -88,7 +89,7 @@ export default function Dashboard() {
             <div className="absolute top-0 right-0 h-24 w-24 bg-sky-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Avg Total Waste</p>
             <h3 className="text-3xl font-bold mt-2 text-white">
-              {parseFloat(data.average_total_waste).toLocaleString(undefined, { maximumFractionDigits: 2 })} tons
+              {parseFloat(averageTotalWaste).toLocaleString(undefined, { maximumFractionDigits: 2 })} tons
             </h3>
             <p className="text-xs text-slate-500 mt-1">Average waste per record</p>
           </div>
@@ -98,7 +99,7 @@ export default function Dashboard() {
             <div className="absolute top-0 right-0 h-24 w-24 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all"></div>
             <p className="text-sm font-medium text-slate-400">Avg Economic Loss</p>
             <h3 className="text-3xl font-bold mt-2 text-white">
-              ${parseFloat(data.average_economic_loss).toLocaleString(undefined, { maximumFractionDigits: 2 })}M
+              ${parseFloat(averageEconomicLoss).toLocaleString(undefined, { maximumFractionDigits: 2 })}M
             </h3>
             <p className="text-xs text-slate-500 mt-1">Financial impact avg</p>
           </div>

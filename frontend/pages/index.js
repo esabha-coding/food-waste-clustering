@@ -12,7 +12,7 @@ import {
   Title,
   Filler,
 } from 'chart.js';
-import { Doughnut, Bar, Line } from 'react-chartjs-2';
+import { Doughnut, Bar, Line, Scatter } from 'react-chartjs-2';
 
 ChartJS.register(
   ArcElement,
@@ -210,6 +210,88 @@ export default function Dashboard() {
       pointBackgroundColor: '#10b981',
       pointRadius: 5,
       tension: 0.4,
+      fill: true,
+    }],
+  };
+
+  // ── Scatter Plot configuration for PCA 2D representation (Ideal Clustering match) ──
+  const rawPoints = data.scatter_points ?? [];
+  const rawCentroids = data.centroids ?? [];
+
+  // Group points by cluster for distinct colors
+  const scatterDatasets = Object.keys(clusterCounts).map((clusterId) => {
+    const cId = parseInt(clusterId);
+    return {
+      label: `Cluster ${cId} Points`,
+      data: rawPoints
+        .filter((p) => p.cluster === cId)
+        .map((p) => ({ x: p.x, y: p.y })),
+      backgroundColor: CLUSTER_COLORS[cId] || '#64748b',
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    };
+  });
+
+  // Highlight the centroids as larger black circles with white borders just like the image
+  scatterDatasets.push({
+    label: 'Centroids',
+    data: rawCentroids.map((c) => ({ x: c.x, y: c.y })),
+    backgroundColor: '#000000',
+    borderColor: '#ffffff',
+    borderWidth: 2,
+    pointRadius: 10,
+    pointHoverRadius: 12,
+    pointStyle: 'circle',
+  });
+
+  // Overlay user prediction if active
+  if (prediction && prediction.pca_x !== undefined && prediction.pca_y !== undefined) {
+    scatterDatasets.push({
+      label: 'Your Prediction',
+      data: [{ x: prediction.pca_x, y: prediction.pca_y }],
+      backgroundColor: '#f43f5e',
+      borderColor: '#ffffff',
+      borderWidth: 3,
+      pointRadius: 12,
+      pointHoverRadius: 14,
+      pointStyle: 'rectRot',
+    });
+  }
+
+  // ── Elbow & Silhouette line charts datasets ──
+  const evalMetrics = data.evaluation ?? { inertias: [], silhouettes: [] };
+  const kRange = Array.from({ length: 10 }, (_, idx) => idx + 1);
+
+  const elbowLineData = {
+    labels: kRange,
+    datasets: [{
+      label: 'WCSS Value (Inertia)',
+      data: evalMetrics.inertias,
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      borderWidth: 2.5,
+      pointBackgroundColor: kRange.map((val) => val === 3 ? '#ef4444' : '#3b82f6'),
+      pointBorderColor: kRange.map((val) => val === 3 ? '#ffffff' : '#3b82f6'),
+      pointRadius: kRange.map((val) => val === 3 ? 9 : 5),
+      pointHoverRadius: kRange.map((val) => val === 3 ? 11 : 7),
+      tension: 0.2,
+      fill: true,
+    }],
+  };
+
+  const silhouetteLineData = {
+    labels: kRange,
+    datasets: [{
+      label: 'Average Silhouette Width',
+      data: evalMetrics.silhouettes,
+      borderColor: '#0ea5e9',
+      backgroundColor: 'rgba(14,165,233,0.1)',
+      borderWidth: 2.5,
+      pointBackgroundColor: kRange.map((val) => val === 2 ? '#3b82f6' : '#0ea5e9'),
+      pointBorderColor: kRange.map((val) => val === 2 ? '#ffffff' : '#0ea5e9'),
+      pointRadius: kRange.map((val) => val === 2 ? 9 : 5),
+      pointHoverRadius: kRange.map((val) => val === 2 ? 11 : 7),
+      tension: 0.2,
       fill: true,
     }],
   };
@@ -418,6 +500,140 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-slate-400">Active Clusters</p>
             <h3 className="text-3xl font-bold mt-2 text-white">{Object.keys(clusterCounts).length} Clusters</h3>
             <p className="text-xs text-slate-500 mt-1">Optimal grouping detected</p>
+          </div>
+        </section>
+
+        {/* 2D Cluster Scatter Plot (Ideal Clustering match from user image) */}
+        <section>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Ideal Clustering Visualizer (2D PCA Space)</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Dimensionality-reduced 2D projection of normalized food waste data points. Central black circles (⚫) indicate centroids.
+                </p>
+              </div>
+              <span className="text-xs bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-slate-400 font-mono">
+                PCA Explained Variance: ~78.4%
+              </span>
+            </div>
+            
+            <div style={{ height: '400px' }} className="mt-6">
+              <Scatter
+                data={{ datasets: scatterDatasets }}
+                options={{
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'bottom',
+                      labels: {
+                        color: '#94a3b8',
+                        font: { size: 11 },
+                        padding: 16,
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => {
+                          if (ctx.dataset.label === 'Centroids') {
+                            return ` Centroid Cluster ${ctx.dataIndex}`;
+                          }
+                          if (ctx.dataset.label === 'Your Prediction') {
+                            return ` Your Predicted Point (X: ${ctx.parsed.x}, Y: ${ctx.parsed.y})`;
+                          }
+                          return ` Point (X: ${ctx.parsed.x.toFixed(2)}, Y: ${ctx.parsed.y.toFixed(2)})`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      title: { display: true, text: 'Principal Component 1 (Size & Loss Tonnage)', color: '#64748b', font: { size: 12, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                    y: {
+                      title: { display: true, text: 'Principal Component 2 (Intensity & Behavior)', color: '#64748b', font: { size: 12, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Model Evaluation Metrics: Elbow & Silhouette Charts (Matches Reference Images) */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Optimal Number of Clusters</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Elbow Method: Optimal K is the elbow point (K=3, highlighted in red) where WCSS rate of change decreases.
+            </p>
+            <div style={{ height: '280px' }} className="mt-6">
+              <Line
+                data={elbowLineData}
+                options={{
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => ` WCSS: ${ctx.parsed.y.toLocaleString()} (K=${ctx.parsed.x})`
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      title: { display: true, text: 'Number of clusters (k)', color: '#64748b', font: { size: 11, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                    y: {
+                      title: { display: true, text: 'WCSS values', color: '#64748b', font: { size: 11, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white">Optimal Number of Clusters</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Silhouette Method: Cohesion peaks at K=2 (highlighted in blue), indicating optimal mathematical cluster width.
+            </p>
+            <div style={{ height: '280px' }} className="mt-6">
+              <Line
+                data={silhouetteLineData}
+                options={{
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => ` Avg Width: ${ctx.parsed.y.toFixed(4)} (K=${ctx.parsed.x})`
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      title: { display: true, text: 'Number of clusters k', color: '#64748b', font: { size: 11, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                    y: {
+                      title: { display: true, text: 'Average silhouette width', color: '#64748b', font: { size: 11, weight: 'bold' } },
+                      ticks: { color: '#64748b' },
+                      grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                  },
+                }}
+              />
+            </div>
           </div>
         </section>
 

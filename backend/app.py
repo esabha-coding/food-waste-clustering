@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,6 +15,9 @@ NUMERIC_COLS = [
     " Avg Waste per Capita (Kg) ",
     " Household Waste (%) ",
 ]
+
+# Cache to avoid re-calculating on every request
+EVALUATION_METRICS = None
 
 app = FastAPI(title="Food Waste Clustering API")
 
@@ -45,6 +49,39 @@ def load_dataset():
     return df
 
 
+def get_evaluation_metrics(X_scaled):
+    global EVALUATION_METRICS
+    if EVALUATION_METRICS is not None:
+        return EVALUATION_METRICS
+
+    inertias = []
+    silhouettes = [0.0]  # K=1 silhouette score is undefined/0.0
+
+    # Downsample slightly to 1200 rows for near-instant calculation on local dev startup
+    n_samples = len(X_scaled)
+    downsample_factor = max(1, n_samples // 1200)
+    X_sub = X_scaled[::downsample_factor]
+
+    from sklearn.metrics import silhouette_score
+
+    for temp_k in range(1, 11):
+        km = KMeans(n_clusters=temp_k, random_state=42, n_init=5)
+        labels = km.fit_predict(X_scaled)
+        inertias.append(round(float(km.inertia_), 2))
+
+        if temp_k > 1:
+            km_sub = KMeans(n_clusters=temp_k, random_state=42, n_init=5)
+            labels_sub = km_sub.fit_predict(X_sub)
+            score = silhouette_score(X_sub, labels_sub)
+            silhouettes.append(round(float(score), 4))
+
+    EVALUATION_METRICS = {
+        "inertias": inertias,
+        "silhouettes": silhouettes,
+    }
+    return EVALUATION_METRICS
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -73,6 +110,32 @@ def get_summary(
     clusters = kmeans.fit_predict(X_scaled)
     df_clean["Cluster"] = clusters
 
+    # Project to 2D PCA Space for Scatter Plot (Ideal Clustering representation)
+    pca = PCA(n_components=2, random_state=42)
+    X_pca = pca.fit_transform(X_scaled)
+
+    # Get centroids in PCA 2D space
+    centroids_pca = pca.transform(kmeans.cluster_centers_)
+
+    # Stable downsampled coordinates for the frontend scatter plot (using fixed seed to avoid layout jumps)
+    sample_indices = df_clean.sample(n=min(300, len(df_clean)), random_state=42).index
+    scatter_points = []
+    for idx in sample_indices:
+        pos = df_clean.index.get_loc(idx)
+        scatter_points.append({
+            "x": round(float(X_pca[pos][0]), 3),
+            "y": round(float(X_pca[pos][1]), 3),
+            "cluster": int(clusters[pos])
+        })
+
+    centroids = []
+    for c_id, centroid_coords in enumerate(centroids_pca):
+        centroids.append({
+            "x": round(float(centroid_coords[0]), 3),
+            "y": round(float(centroid_coords[1]), 3),
+            "cluster": c_id
+        })
+
     prediction_result = None
     if (
         predict_waste is not None
@@ -84,6 +147,9 @@ def get_summary(
         input_scaled = scaler.transform(input_data)
         predicted_cluster = int(kmeans.predict(input_scaled)[0])
 
+        # Project user's prediction to PCA 2D space as well to plot it!
+        input_pca = pca.transform(input_scaled)[0]
+
         # Centroid info
         centroid_scaled = kmeans.cluster_centers_[predicted_cluster]
         distance = float(np.linalg.norm(input_scaled[0] - centroid_scaled))
@@ -94,6 +160,8 @@ def get_summary(
         prediction_result = {
             "predicted_cluster": predicted_cluster,
             "distance_to_centroid": round(distance, 4),
+            "pca_x": round(float(input_pca[0]), 3),
+            "pca_y": round(float(input_pca[1]), 3),
             "averages": {
                 "avg_total_waste_tons": round(float(pred_group[" Total Waste in Tons "].mean()), 2),
                 "avg_economic_loss_million": round(float(pred_group[" Food Economic Loss (Million $) "].mean()), 2),
@@ -137,6 +205,9 @@ def get_summary(
         .to_dict()
     )
 
+    # Retrieve evaluation metrics
+    eval_metrics = get_evaluation_metrics(X_scaled)
+
     return {
         "k": k,
         "rows": int(len(df_clean)),
@@ -150,4 +221,7 @@ def get_summary(
         "cluster_averages": cluster_averages,
         "year_trend": {str(yr): int(val) for yr, val in year_trend.items()},
         "prediction": prediction_result,
+        "scatter_points": scatter_points,
+        "centroids": centroids,
+        "evaluation": eval_metrics,
     }

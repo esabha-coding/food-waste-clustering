@@ -27,8 +27,7 @@ ChartJS.register(
   Filler
 );
 
-const CLUSTER_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b'];
-const CLUSTER_BG = ['rgba(16,185,129,0.15)', 'rgba(14,165,233,0.15)', 'rgba(139,92,246,0.15)', 'rgba(244,63,94,0.15)'];
+const CLUSTER_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#ec4899'];
 const BAR_COLORS = [
   'rgba(16,185,129,0.75)', 'rgba(14,165,233,0.75)', 'rgba(139,92,246,0.75)', 'rgba(244,63,94,0.75)',
   'rgba(245,158,11,0.75)', 'rgba(251,146,60,0.75)', 'rgba(99,102,241,0.75)', 'rgba(20,184,166,0.75)',
@@ -47,22 +46,60 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetch('/api/summary')
+  // K-means parameters
+  const [k, setK] = useState(2);
+
+  // Prediction Form states
+  const [waste, setWaste] = useState('25000');
+  const [loss, setLoss] = useState('18000');
+  const [capita, setCapita] = useState('110');
+  const [household, setHousehold] = useState('50');
+  const [predicting, setPredicting] = useState(false);
+
+  const fetchClusteringData = (clusterK, predictParams = null) => {
+    let url = `/api/summary?k=${clusterK}`;
+    if (predictParams) {
+      url += `&predict_waste=${predictParams.waste}&predict_loss=${predictParams.loss}&predict_capita=${predictParams.capita}&predict_household=${predictParams.household}`;
+    }
+
+    setLoading(true);
+    fetch(url)
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch backend data');
+        if (!res.ok) throw new Error('Failed to fetch backend clustering data');
         return res.json();
       })
-      .then((d) => { setData(d); setLoading(false); })
-      .catch((err) => { setError(err.message); setLoading(false); });
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchClusteringData(k);
   }, []);
 
-  if (loading) {
+  const handleKChange = (newK) => {
+    setK(newK);
+    fetchClusteringData(newK);
+  };
+
+  const handlePredictionSubmit = (e) => {
+    e.preventDefault();
+    setPredicting(true);
+    fetchClusteringData(k, { waste, loss, capita, household });
+    setPredicting(false);
+  };
+
+  if (loading && !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-slate-400 font-medium">Analyzing trained model metrics...</p>
+          <p className="mt-4 text-slate-400 font-medium">Fitting K-Means model on the fly...</p>
         </div>
       </div>
     );
@@ -75,6 +112,12 @@ export default function Dashboard() {
           <span className="text-4xl">⚠️</span>
           <h3 className="mt-2 text-lg font-semibold text-rose-200">Connection Failed</h3>
           <p className="mt-1 text-sm text-rose-300/80">{error}</p>
+          <button
+            onClick={() => fetchClusteringData(k)}
+            className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
+          >
+            Retry Connection
+          </button>
         </div>
       </div>
     );
@@ -87,15 +130,16 @@ export default function Dashboard() {
   const yearTrend = data.year_trend ?? {};
   const averageTotalWaste = data.avg_total_waste_tons ?? 0;
   const averageEconomicLoss = data.avg_economic_loss_million ?? 0;
+  const prediction = data.prediction;
 
   // ── Chart datasets ──────────────────────────────────────────────
 
   const clusterDoughnutData = {
-    labels: Object.keys(clusterCounts).map((k) => `Cluster ${k}`),
+    labels: Object.keys(clusterCounts).map((key) => `Cluster ${key}`),
     datasets: [{
       data: Object.values(clusterCounts),
-      backgroundColor: CLUSTER_COLORS,
-      borderColor: CLUSTER_COLORS,
+      backgroundColor: CLUSTER_COLORS.slice(0, Object.keys(clusterCounts).length),
+      borderColor: CLUSTER_COLORS.slice(0, Object.keys(clusterCounts).length),
       borderWidth: 2,
       hoverOffset: 8,
     }],
@@ -125,29 +169,29 @@ export default function Dashboard() {
 
   const clusterIds = Object.keys(clusterAverages).sort();
   const clusterCompareData = {
-    labels: clusterIds.map((k) => `Cluster ${k}`),
+    labels: clusterIds.map((key) => `Cluster ${key}`),
     datasets: [
       {
         label: 'Avg Total Waste (Tons)',
-        data: clusterIds.map((k) => clusterAverages[k]?.avg_total_waste_tons ?? 0),
+        data: clusterIds.map((key) => clusterAverages[key]?.avg_total_waste_tons ?? 0),
         backgroundColor: 'rgba(16,185,129,0.7)',
         borderRadius: 6,
       },
       {
         label: 'Avg Economic Loss ($M)',
-        data: clusterIds.map((k) => clusterAverages[k]?.avg_economic_loss_million ?? 0),
+        data: clusterIds.map((key) => clusterAverages[key]?.avg_economic_loss_million ?? 0),
         backgroundColor: 'rgba(14,165,233,0.7)',
         borderRadius: 6,
       },
       {
         label: 'Avg Per Capita Waste (Kg)',
-        data: clusterIds.map((k) => clusterAverages[k]?.avg_per_capita_waste_kg ?? 0),
+        data: clusterIds.map((key) => clusterAverages[key]?.avg_per_capita_waste_kg ?? 0),
         backgroundColor: 'rgba(139,92,246,0.7)',
         borderRadius: 6,
       },
       {
         label: 'Avg Household Waste (%)',
-        data: clusterIds.map((k) => clusterAverages[k]?.avg_household_waste_percent ?? 0),
+        data: clusterIds.map((key) => clusterAverages[key]?.avg_household_waste_percent ?? 0),
         backgroundColor: 'rgba(245,158,11,0.7)',
         borderRadius: 6,
       },
@@ -177,7 +221,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <span className="text-xs font-semibold tracking-wider text-emerald-400 uppercase bg-emerald-950/50 border border-emerald-800/50 px-2.5 py-1 rounded-full">
-              ML Clustering Active
+              Interactive ML Dashboard
             </span>
             <h1 className="text-2xl font-bold tracking-tight mt-2 text-white">
               Food Waste Clustering Analysis
@@ -185,12 +229,162 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-800">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Connected to API
+            K-Means Fitted (K={k})
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        
+        {/* Interactive Controls & Live Prediction */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* K Slider Card */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl lg:col-span-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">K-Means Configuration</h3>
+                <span className="text-xs text-slate-400 bg-slate-800 border border-slate-700/50 px-2 py-0.5 rounded">Dynamic</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Adjust number of groups (K) to fit the dataset dynamically</p>
+              
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-300">Number of Clusters (k)</span>
+                  <span className="text-2xl font-bold text-emerald-400">{k}</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="6"
+                  value={k}
+                  onChange={(e) => handleKChange(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-xs text-slate-500 px-1">
+                  <span>2 Groups</span>
+                  <span>4 Groups</span>
+                  <span>6 Groups</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-slate-800/50 pt-4">
+              <div className="text-xs text-slate-500 space-y-1">
+                <p>• Model fits 5,000 records dynamically using <code className="text-violet-400">scikit-learn</code></p>
+                <p>• Normalization utilizes <code className="text-violet-400">StandardScaler</code></p>
+              </div>
+            </div>
+          </div>
+
+          {/* Predict Cluster Card */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl lg:col-span-8">
+            <h3 className="text-lg font-semibold text-white">Test / Predict with Custom Values</h3>
+            <p className="text-xs text-slate-400 mt-1">Input custom details to instantly see which cluster they fit into</p>
+
+            <form onSubmit={handlePredictionSubmit} className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Total Waste (Tons)</label>
+                <input
+                  type="number"
+                  value={waste}
+                  onChange={(e) => setWaste(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Food Economic Loss (Million $)</label>
+                <input
+                  type="number"
+                  value={loss}
+                  onChange={(e) => setLoss(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Avg Waste per Capita (Kg)</label>
+                <input
+                  type="number"
+                  value={capita}
+                  onChange={(e) => setCapita(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Household Waste (%)</label>
+                <input
+                  type="number"
+                  value={household}
+                  onChange={(e) => setHousehold(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition"
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2 mt-2 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <button
+                  type="submit"
+                  disabled={predicting}
+                  className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"
+                >
+                  {predicting ? 'Processing...' : 'Predict & Overlay Cluster'}
+                </button>
+
+                {prediction && (
+                  <div className="text-xs text-emerald-400 font-medium">
+                    ✓ Success: Computed distances to all centroids in milliseconds
+                  </div>
+                )}
+              </div>
+            </form>
+          </div>
+        </section>
+
+        {/* Prediction Results Banner */}
+        {prediction && (
+          <section className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl"></div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <span className="text-xs font-bold tracking-wider text-emerald-400 uppercase bg-emerald-950 border border-emerald-800/80 px-2.5 py-1 rounded-full">
+                  Prediction Match
+                </span>
+                <h3 className="text-xl font-bold mt-3 text-white">
+                  Predicted Cluster: <span style={{ color: CLUSTER_COLORS[prediction.predicted_cluster] }}>Cluster {prediction.predicted_cluster}</span>
+                </h3>
+                <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+                  Your custom input fits closest to the centroid of <strong style={{ color: CLUSTER_COLORS[prediction.predicted_cluster] }}>Cluster {prediction.predicted_cluster}</strong>. 
+                  The mathematical Euclidean distance to this centroid in standardized space is <strong>{prediction.distance_to_centroid}</strong>.
+                </p>
+              </div>
+
+              <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2 text-xs min-w-[240px]">
+                <div className="text-slate-400 font-semibold uppercase tracking-wider">Cluster {prediction.predicted_cluster} Centroid Averages</div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Waste:</span>
+                  <span className="text-slate-300 font-medium">{prediction.averages.avg_total_waste_tons.toLocaleString()} tons</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Loss:</span>
+                  <span className="text-slate-300 font-medium">${prediction.averages.avg_economic_loss_million.toLocaleString()}M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Capita:</span>
+                  <span className="text-slate-300 font-medium">{prediction.averages.avg_per_capita_waste_kg} kg</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Household:</span>
+                  <span className="text-slate-300 font-medium">{prediction.averages.avg_household_waste_percent}%</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* KPI Cards */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -339,7 +533,7 @@ export default function Dashboard() {
             <div className="mt-6 space-y-4">
               {Object.entries(clusterCounts).map(([cluster, count], i) => {
                 const percentage = ((count / data.rows) * 100).toFixed(1);
-                const bar = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-rose-500'][i] ?? 'bg-slate-500';
+                const bar = CLUSTER_COLORS[i] ? `bg-[${CLUSTER_COLORS[i]}]` : 'bg-slate-500';
                 return (
                   <div key={cluster} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -347,7 +541,13 @@ export default function Dashboard() {
                       <span className="text-slate-400">{count.toLocaleString()} rows ({percentage}%)</span>
                     </div>
                     <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                      <div className={`${bar} h-full rounded-full`} style={{ width: `${percentage}%` }}></div>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: CLUSTER_COLORS[i] || '#64748b'
+                        }}
+                      ></div>
                     </div>
                   </div>
                 );
@@ -370,7 +570,7 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-slate-800/50">
                   <tr>
                     <td className="py-3.5 font-medium text-slate-300">Target Clustering Columns</td>
-                    <td className="py-3.5 text-slate-400">Waste Volume, Economic Loss</td>
+                    <td className="py-3.5 text-slate-400">Waste Volume, Economic Loss, Per Capita, Household</td>
                     <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">Trained</span></td>
                   </tr>
                   <tr>
@@ -381,7 +581,7 @@ export default function Dashboard() {
                   <tr>
                     <td className="py-3.5 font-medium text-slate-300">Algorithm</td>
                     <td className="py-3.5 text-slate-400">K-Means Clustering</td>
-                    <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-950 text-violet-400 border border-violet-800">Fitted</span></td>
+                    <td className="py-3.5"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-950 text-violet-400 border border-violet-800">Dynamic</span></td>
                   </tr>
                   <tr>
                     <td className="py-3.5 font-medium text-slate-300">Per Capita Avg</td>

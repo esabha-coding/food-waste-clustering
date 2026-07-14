@@ -127,6 +127,16 @@ npm run dev
 
 The frontend proxies API calls to the backend; ensure the backend is running first.
 
+## Vercel Deployment Notes
+
+- Root `vercel.json` is configured to build:
+  - `frontend/` as Next.js
+  - `api/index.py` as a Python serverless function
+- `api/index.py` reuses `backend.app` so `/api/summary` and `/health` are available on Vercel.
+- For frontend-only deployments (without root `vercel.json` routing), set:
+  - `BACKEND_API_URL=https://<your-backend-domain>`
+  - (optional fallback) `NEXT_PUBLIC_API_URL=https://<your-backend-domain>`
+
 ## API Endpoints
 
 - `GET /health` — health check (if implemented)
@@ -175,5 +185,4 @@ Contributions welcome. Suggested process:
 
 - Dataset source (place the original data source citation here)
 - Libraries and tools used: pandas, scikit-learn, FastAPI, Next.js
-
 
